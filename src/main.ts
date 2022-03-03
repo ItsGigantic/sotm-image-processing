@@ -2,11 +2,7 @@ import './style.css'
 import process from "./lib";
 import {html, render} from "uhtml";
 
-const imgRef: {
-    current: HTMLImageElement | null;
-} = {
-    current: null
-};
+const outputInst = output();
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 render(app, html`
@@ -58,7 +54,7 @@ render(app, html`
             <div class="field">
                 <label class="label">Delay</label>
                 <input name="d" class="input" type="number" />
-                <p class="help">Delay between frames, in milliseconds</p>
+                <p class="help">Delay between frames, in milliseconds (minimum 11)</p>
             </div>
             
             <div class="field">
@@ -71,54 +67,70 @@ render(app, html`
                 </p>
             </div>
             
-            <div class="field">
-                <div class="control">
-                    <button class="button is-link" onclick=${async (e: any) => {
-                        e.target.disabled = true;
-                        
-                        try {
-                            // Get inputs
-                            const { w, h, ow, oh, d, c } = Array.from(app.querySelectorAll<HTMLInputElement>('input'))
-                                    .reduce((acc, cur) => ({ ...acc, [cur.name]: cur.value !== "" ? Number(cur.value) : undefined }), {} as Record<string, number | undefined>);
-                            
-                            // Check if inputs undefined
-                            if (w === undefined || h === undefined || ow === undefined || oh === undefined || d === undefined) {
-                                throw new Error('Missing inputs');
-                            }
-
-                            const handles = await window.showOpenFilePicker({
-                                multiple: true,
-                                types: [{
-                                    description: "PNG images",
-                                    accept: {
-                                        "image/png": [".png", ".apng"]
-                                    }
-                                }]
-                            });
-
-                            const buffers = await Promise.all(handles.map(async handle => await (await handle.getFile()).arrayBuffer()));
-
-                            const res = await process(buffers, w, h, ow, oh, d, c);
-                            
-                            const blob = new Blob([res], { type: 'image/apng' });
-                            imgRef.current!.src = URL.createObjectURL(blob);
-                        } catch (e) {
-                            console.error(e);
-                            alert((e as Error).message);
-                        } finally {
-                            e.target.disabled = false;
-                        }
-                    }}>Select files</button>
-                </div>
-            </div>
-            
-            <img ref=${imgRef} alt="Generated APNG image" />
+            ${outputInst()}
         </div>
     </section>
 `);
 
-// async function run(/*progressCallback: (progress: number, total: number) => void*/) {
-//
-//     // TODO
-//     // const res = await process(buffers);
-// }
+function output() {
+    let loading = false;
+    let imageSrc: string | undefined = undefined;
+    const container = document.createElement('div');
+
+    const run = async () => {
+        loading = true;
+        imageSrc = undefined;
+        update();
+
+        try {
+            // Get inputs
+            const { w, h, ow, oh, d, c } = Array.from(app.querySelectorAll<HTMLInputElement>('input'))
+                .reduce((acc, cur) => ({ ...acc, [cur.name]: cur.value !== "" ? Number(cur.value) : undefined }), {} as Record<string, number | undefined>);
+
+            // Check if inputs undefined
+            if (w === undefined || h === undefined || ow === undefined || oh === undefined || d === undefined) {
+                throw new Error('Missing inputs');
+            }
+
+            const handles = await window.showOpenFilePicker({
+                multiple: true,
+                types: [{
+                    description: "PNG images",
+                    accept: {
+                        "image/png": [".png", ".apng"]
+                    }
+                }]
+            });
+
+            const buffers = await Promise.all(handles.map(async handle => await (await handle.getFile()).arrayBuffer()));
+
+            const res = await process(buffers, w, h, ow, oh, d, c);
+
+            const blob = new Blob([res], { type: 'image/apng' });
+            imageSrc = URL.createObjectURL(blob);
+            update();
+        } catch (e) {
+            console.error(e);
+            alert((e as Error).message);
+        } finally {
+            loading = false;
+            update();
+        }
+    };
+
+    function update() {
+        return render(container, html`
+            <div class="field">
+                <div class="control">
+                    <button class="button is-link" onclick=${run} ?disabled=${loading}>${loading ? "Loading..." : "Select files"}</button>
+                </div>
+            </div>
+            ${imageSrc !== undefined ? html`
+                <img src=${imageSrc} alt="Generated APNG image" />
+                <a class="button" href=${imageSrc} download="output.apng">Save</a>
+            ` : null}
+        `)
+    }
+
+    return update;
+}

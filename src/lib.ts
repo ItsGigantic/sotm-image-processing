@@ -52,5 +52,5 @@ export default async function process(buffers: ArrayBuffer[], cropW: number, cro
         );
     }));
 
-    return UPNG.encode(transformed, resizeW, resizeH, compression, /*delay as any as number[]*/ Array(buffers.length).fill(delay));
+    return UPNG.encode(transformed, resizeW, resizeH, compression, Array(buffers.length).fill(delay));
 }
