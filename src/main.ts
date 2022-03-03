@@ -73,7 +73,7 @@ render(app, html`
             
             <div class="field">
                 <div class="control">
-                    <button class="button is-link" onclick=${async (e) => {
+                    <button class="button is-link" onclick=${async (e: any) => {
                         e.target.disabled = true;
                         
                         try {
